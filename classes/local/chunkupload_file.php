@@ -49,11 +49,11 @@ class chunkupload_file {
      */
     public function __construct($token) {
         global $DB;
-        $record = $DB->get_record('local_chunkupload_files', array('id' => $token));
+        $record = $DB->get_record('local_chunkupload_files', array('token' => $token));
         if (!$record) {
             throw new \moodle_exception("Chunkupload file does not exist");
         }
-        $this->token = $record->id;
+        $this->token = $record->token;
         $this->filename = $record->filename;
     }
 
@@ -87,7 +87,7 @@ class chunkupload_file {
      * @return string
      */
     public function get_fullpath() {
-        return chunkupload_form_element::get_path_for_id($this->get_token());
+        return chunkupload_form_element::get_path_for_token($this->get_token());
     }
 
     /**

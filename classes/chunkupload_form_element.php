@@ -107,14 +107,14 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
      */
     public function tohtml() {
         global $CFG, $PAGE, $OUTPUT;
-        $id = $this->_attributes['id'];
+        $token = $this->_attributes['id'];
         $elname = $this->_attributes['name'];
         $showfinishedicon = false;
         $filenamestring = null;
 
         if ($value = $this->getvalue()) {
             global $DB;
-            if ($record = $DB->get_record('local_chunkupload_files', ['id' => $value])) {
+            if ($record = $DB->get_record('local_chunkupload_files', ['token' => $value])) {
                 if ($record->state == state_type::UPLOAD_COMPLETED) {
                     $filenamestring = $record->filename;
                     $showfinishedicon = true;
@@ -130,7 +130,7 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
         }
 
         $context = [
-                'elid' => $id,
+                'elid' => $token,
                 'elname' => $elname,
                 'value' => $value,
                 'filenamestring' => $filenamestring,
@@ -153,7 +153,7 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
         }
 
         $PAGE->requires->js_call_amd('local_chunkupload/chunkupload', 'init', array(
-                'elementid' => $id,
+                'elementid' => $token,
                 'acceptedTypes' => $acceptedtypes,
                 'maxBytes' => (int) $this->_options['maxbytes'],
                 'wwwroot' => $CFG->wwwroot,
@@ -201,20 +201,20 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
         if (is_null($value)) {
             return "";
         }
-        $record = $DB->get_record('local_chunkupload_files', ['id' => $value]);
+        $record = $DB->get_record('local_chunkupload_files', ['token' => $value]);
         if (!$record || $record->state == state_type::UNUSED_TOKEN_GENERATED) {
             return "";
         }
         if ($record->state == state_type::UPLOAD_STARTED) {
             return get_string('uploadnotfinished', 'local_chunkupload');
         }
-        $path = self::get_path_for_id($value);
+        $path = self::get_path_for_token($value);
         if ($path == null || !file_exists($path)) {
             return get_string('nofile', 'error');
         }
         if (filesize($path) > $this->_options['maxbytes']) {
             unlink($path);
-            $DB->delete_records('local_chunkupload_files', ['id' => $value]);
+            $DB->delete_records('local_chunkupload_files', ['token' => $value]);
             return get_string('errorfiletoobig', $this->_options['maxbytes']);
         }
 
@@ -223,7 +223,7 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
         $filename = $record->filename;
         if (!$util->is_allowed_file_type($filename, $allowlist)) {
             unlink($path);
-            $DB->delete_records('local_chunkupload_files', ['id' => $value]);
+            $DB->delete_records('local_chunkupload_files', ['token' => $value]);
             $filetype = substr($filename, strrpos($filename, '.'));
             return get_string('invalidfiletype', 'core_repository', $filetype);
         }
@@ -243,17 +243,17 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
         }
 
         do {
-            $id = rand(0, 10000000000);
-        } while ($DB->record_exists('local_chunkupload_files', ['id' => $id]));
+            $token = random_string();
+        } while ($DB->record_exists('local_chunkupload_files', ['token' => $token]));
 
         $record = new \stdClass();
-        $record->id = $id;
+        $record->token = $token;
         $record->userid = $USER->id;
         $record->contextid = $PAGE->context->id;
         $record->maxlength = $this->_options['maxbytes'];
         $record->lastmodified = time();
-        $DB->insert_record_raw('local_chunkupload_files', $record, false, false, true);
-        return $id;
+        $DB->insert_record('local_chunkupload_files', $record);
+        return $token;
     }
 
     /**
@@ -266,13 +266,14 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
     }
 
     /**
-     * Returns the filepath for the chunkupload with the given id.
-     * @param int $id The id.
+     * Returns the filepath for the chunkupload with the given token.
+     *
+     * @param int $token The token.
      * @return string|null The filepath.
      */
-    public static function get_path_for_id($id) {
-        if ($id) {
-            return self::get_base_folder() . $id;
+    public static function get_path_for_token($token) {
+        if ($token) {
+            return self::get_base_folder() . $token;
         } else {
             return null;
         }
@@ -280,31 +281,31 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
 
     /**
      * Exports the uploaded file referenced by the $chunkuploadid to the given filearea.
-     * @param int $chunkuploadid The chunkupload id of the file to export.
+     * @param int $chunkuploadtoken The chunkupload token of the file to export.
      * @param int $newcontextid The contextid for the filearea.
      * @param string $newcomponent The component for the filearea.
      * @param string $newfilearea The filearea where to export the file to
      * @param string $newfilepath The filepath where to export the file to.
      * @return \stored_file|null The file that is stored in the filearea.
      */
-    public static function export_to_filearea($chunkuploadid, $newcontextid, $newcomponent, $newfilearea,
+    public static function export_to_filearea($chunkuploadtoken, $newcontextid, $newcomponent, $newfilearea,
                                               $newfilepath='/') {
         global $DB;
         $fs = get_file_storage();
-        $record = $DB->get_record('local_chunkupload_files', ['id' => $chunkuploadid], '*', IGNORE_MISSING);
+        $record = $DB->get_record('local_chunkupload_files', ['token' => $chunkuploadtoken], '*', IGNORE_MISSING);
         if (!$record || $record->state !== state_type::UPLOAD_COMPLETED) {
             return null;
         }
 
         $filerecord = array('contextid' => $newcontextid, 'component' => $newcomponent,
-                'filearea' => $newfilearea, 'itemid' => $chunkuploadid, 'filepath' => $newfilepath,
+                'filearea' => $newfilearea, 'itemid' => $chunkuploadtoken, 'filepath' => $newfilepath,
                 'filename' => $record->filename, 'userid' => $record->userid);
 
         \core_php_time_limit::raise();
 
         // Increase memory limit.
         raise_memory_limit(MEMORY_EXTRA);
-        $file = $fs->create_file_from_pathname($filerecord, self::get_path_for_id($chunkuploadid));
+        $file = $fs->create_file_from_pathname($filerecord, self::get_path_for_token($chunkuploadtoken));
         reduce_memory_limit(MEMORY_STANDARD);
 
         return $file;
@@ -312,12 +313,13 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
 
     /**
      * Remove chunkupload file.
-     * @param string $chunkuploadid token of the chunkupload job.
+     *
+     * @param string $chunkuploadtoken token of the chunkupload job.
      */
-    public static function delete_file($chunkuploadid) {
+    public static function delete_file($chunkuploadtoken) {
         global $DB;
-        $DB->delete_records('local_chunkupload_files', array('id' => $chunkuploadid));
-        $path = self::get_path_for_id($chunkuploadid);
+        $DB->delete_records('local_chunkupload_files', array('token' => $chunkuploadtoken));
+        $path = self::get_path_for_token($chunkuploadtoken);
         if (file_exists($path)) {
             unlink($path);
         }
@@ -325,15 +327,16 @@ class chunkupload_form_element extends \HTML_QuickForm_input implements \templat
 
     /**
      * Returns whether a file is uploaded for a given chunkupload id.
-     * @param int $id the chunkupload id.
+     *
+     * @param int $token the chunkupload token.
      * @return bool whether a file was uploaded.
      */
-    public static function is_file_uploaded($id) {
+    public static function is_file_uploaded($token) {
         global $DB;
-        if (is_null($id)) {
+        if (is_null($token)) {
             return false;
         }
-        $record = $DB->get_record('local_chunkupload_files', ['id' => $id]);
+        $record = $DB->get_record('local_chunkupload_files', ['token' => $token]);
         if (!$record) {
             return false;
         }

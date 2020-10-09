@@ -34,7 +34,7 @@ $PAGE->set_url(new moodle_url('/local/chunkupload/tests/testupload.php'));
 
 // Ensure either PHPUNIT_TEST or BEHAT_SITE_RUNNING are defined or $CFG->istestenviroment = true.
 if (!((defined('PHPUNIT_TEST') && PHPUNIT_TEST) || defined('BEHAT_SITE_RUNNING') ||
-        (object_property_exists($CFG, 'istestenvironment') && $CFG->istestenvironment))) {
+        (object_property_exists($CFG, 'chunkupload_testenvironment') && $CFG->chunkupload_testenvironment))) {
     http_response_code(404);
     die();
 }
@@ -45,7 +45,7 @@ echo $OUTPUT->header();
 $mform = new testmform($PAGE->url);
 if ($data = $mform->get_data()) {
     if (chunkupload_form_element::is_file_uploaded($data->test)) {
-        $path = chunkupload_form_element::get_path_for_id($data->test);
+        $path = chunkupload_form_element::get_path_for_token($data->test);
         echo '<code>Hash=' . md5_file($path) . '</code>';
         echo '<br><br><br>';
     }

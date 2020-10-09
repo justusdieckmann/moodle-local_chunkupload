@@ -28,21 +28,21 @@ define('AJAX_SCRIPT', true);
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/../../lib/filelib.php');
 
-$id = optional_param("id", null, PARAM_ALPHANUM);
+$token = optional_param("id", null, PARAM_ALPHANUM);
 $start = optional_param("start", null, PARAM_INT);
 $length = optional_param("length", 0, PARAM_INT);
 $end = optional_param("end", null, PARAM_INT);
 $filename = optional_param("filename", null, PARAM_FILE);
 
 $err = new stdClass();
-if (!$id) {
+if (!$token) {
     $PAGE->set_context(context_system::instance());
     echo $OUTPUT->header();
     $err->error = "Parameter id is missing.";
     die(json_encode($err));
 }
 
-$filerecord = $DB->get_record('local_chunkupload_files', ['id' => $id]);
+$filerecord = $DB->get_record('local_chunkupload_files', ['token' => $token]);
 if (!$filerecord) {
     $PAGE->set_context(context_system::instance());
     echo $OUTPUT->header();
@@ -91,7 +91,7 @@ if ($end > $length) {
     die(json_encode($err));
 }
 
-$path = \local_chunkupload\chunkupload_form_element::get_path_for_id($id);
+$path = \local_chunkupload\chunkupload_form_element::get_path_for_token($token);
 $content = file_get_contents('php://input', false, null, 0, $end);
 if (strlen($content) != $end) {
     $err->error = "Filechunk is not as long as it should be.";

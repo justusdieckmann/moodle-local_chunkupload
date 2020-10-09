@@ -28,17 +28,17 @@ define('AJAX_SCRIPT', true);
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/../../lib/filelib.php');
 
-$id = optional_param("id", null, PARAM_ALPHANUM);
+$token = optional_param("id", null, PARAM_ALPHANUM);
 
 $err = new stdClass();
-if (!$id) {
+if (!$token) {
     $PAGE->set_context(context_system::instance());
     echo $OUTPUT->header();
     $err->error = "Parameter id is missing.";
     die(json_encode($err));
 }
 
-$record = $DB->get_record('local_chunkupload_files', ['id' => $id]);
+$record = $DB->get_record('local_chunkupload_files', ['token' => $token]);
 if (!$record) {
     $PAGE->set_context(context_system::instance());
     echo $OUTPUT->header();
@@ -62,7 +62,7 @@ if ($USER->id != $record->userid) {
     die(json_encode($err));
 }
 
-$path = \local_chunkupload\chunkupload_form_element::get_path_for_id($id);
+$path = \local_chunkupload\chunkupload_form_element::get_path_for_token($token);
 
 if (file_exists($path)) {
 

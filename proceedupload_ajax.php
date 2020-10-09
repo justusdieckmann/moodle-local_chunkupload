@@ -28,19 +28,19 @@ define('AJAX_SCRIPT', true);
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/../../lib/filelib.php');
 
-$id = optional_param("id", null, PARAM_ALPHANUM);
+$token = optional_param("id", null, PARAM_ALPHANUM);
 $start = optional_param("start", null, PARAM_INT);
 $end = optional_param("end", null, PARAM_INT);
 
 $err = new stdClass();
-if (!$id) {
+if (!$token) {
     $PAGE->set_context(context_system::instance());
     echo $OUTPUT->header();
     $err->error = "Parameter id is missing.";
     die(json_encode($err));
 }
 
-$record = $DB->get_record('local_chunkupload_files', ['id' => $id]);
+$record = $DB->get_record('local_chunkupload_files', ['token' => $token]);
 if (!$record) {
     $PAGE->set_context(context_system::instance());
     echo $OUTPUT->header();
@@ -70,13 +70,6 @@ if ($end === null) {
     die(json_encode($err));
 }
 
-$record = $DB->get_record('local_chunkupload_files', ['id' => $id]);
-
-if (!$record) {
-    $err->error = "Record for given file does not exist.";
-    die(json_encode($err));
-}
-
 if ($USER->id != $record->userid) {
     $err->error = "Request was made by a different user!";
     die(json_encode($err));
@@ -97,7 +90,7 @@ if ($end > $record->length) {
     die(json_encode($err));
 }
 
-$path = \local_chunkupload\chunkupload_form_element::get_path_for_id($id);
+$path = \local_chunkupload\chunkupload_form_element::get_path_for_token($token);
 
 if (!file_exists($path)) {
     $err->error = "Begin of file does not exist on this server.";
